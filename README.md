@@ -11,9 +11,17 @@ To maintain security and avoid nested Git repositories, follow this structure:
 
 ```text
 /home/tis/websites/
-├── global.env            # SHARED SECRETS (Manually created, NOT in Git)
-├── hosting-core/         # THIS REPOSITORY (Network & Tunnel)
-│   ├── .env.example      # Template for global.env
-│   └── docker-compose.yml
-└── [satellite-apps]/     # Other service repositories
-    └── docker-compose.yml
+├── .env                      # SHARED CONFIG (Automatically copied from this repo's global.env)
+├── update.sh                 # UPDATE SCRIPT (Automatically copied from this repo's global.update.sh)
+├── hosting-core/             # THIS REPOSITORY (Network & Tunnel)
+│   ├── global.env                # SHARED CONFIG (Automatically copied to parent .env)
+│   ├── global.update.sh          # UPDATE SCRIPT (Automatically copied to parent update.sh)
+|   ├── .env                      # SECRET CONFIG TEMPLATE (Pushed to GitHub, locally copy to .env.local and add secrets)
+|   ├── .env.local                # SECRET CONFIG (Manually written from .env and not pushed to GitHub)
+|   ├── update.sh                 # UPDATE SCRIPT
+│   └── docker-compose.yml        # DOCKER COMPOSE
+└── [website]/                # WEBSITE REPOSITORY (One for each website)
+    ├── .env                      # SECRET CONFIG TEMPLATE (Pushed to GitHub, locally copy to .env.local and add secrets)
+    ├── .env.local                # SECRET CONFIG (Manually written from .env and not pushed to GitHub)
+    ├── update.sh                 # UPDATE SCRIPT
+    └── docker-compose.yml        # DOCKER COMPOSE
