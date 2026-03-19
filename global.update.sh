@@ -16,7 +16,7 @@ echo "🌐 TIS MASTER UPDATE INITIATED"
 echo "========================================="
 echo ""
 
-echo ">>> [Master] SYNCING CORE INFRASTRUCTURE"
+echo ">>> [Master]  🔄 SYNCING CORE INFRASTRUCTURE"
 cd "$(dirname "$0")/hosting-core" || exit 1
 
 # Check commits to see if the core repository actually receives updates
@@ -26,12 +26,12 @@ REMOTE_COMMIT=$(git rev-parse HEAD)
 
 CORE_CHANGED=0
 if [ "$LOCAL_COMMIT" != "$REMOTE_COMMIT" ]; then
-    echo ">>> [Master] Core repository updated."
+    echo ">>> [Master]  ⚠️ Core repository updated."
     CORE_CHANGED=1
 fi
 echo ""
 
-echo ">>> [Master] PROPAGATING GLOBAL CONFIGS"
+echo ">>> [Master]  🌐 PROPAGATING GLOBAL CONFIGS"
 cp global.env ../.env
 cp global.update.sh ../update.sh
 chmod +x ../update.sh
@@ -41,7 +41,7 @@ ENV_HASH_AFTER=$(md5sum ../.env | awk '{ print $1 }')
 
 GLOBAL_ENV_CHANGED=0
 if [ "$ENV_HASH_BEFORE" != "$ENV_HASH_AFTER" ]; then
-    echo ">>> [Master] ⚠️ Global .env changed. Forcing rebuild across all sites..."
+    echo ">>> [Master]  ⚠️ Global .env changed. Forcing rebuild across all sites..."
     GLOBAL_ENV_CHANGED=1
 else
     echo "Configs propagated (no changes detected)."
@@ -51,7 +51,7 @@ echo ""
 # Self-update check
 SCRIPT_HASH_AFTER=$(md5sum "$SCRIPT_PATH" | awk '{ print $1 }')
 if [ "$SCRIPT_HASH_BEFORE" != "$SCRIPT_HASH_AFTER" ]; then
-    echo ">>> [Master] ⚠️ Master script updated itself. Restarting execution..."
+    echo ">>> [Master]  ⚠️ Master script updated itself. Restarting execution..."
     exec "$SCRIPT_PATH" $ARGS
 fi
 
@@ -77,7 +77,7 @@ for dir in ../*/; do
     fi
 done
 
-echo ">>> [Master] 🧹 CLEANING UP DOCKER SYSTEM"
+echo ">>> [Master]  🧹 CLEANING UP DOCKER SYSTEM"
 docker image prune -f > /dev/null
 echo ""
 
