@@ -25,3 +25,34 @@ To maintain security and avoid nested Git repositories, follow this structure:
     ├── .env.local                # SECRET CONFIG (Manually written from .env and not pushed to GitHub)
     ├── update.sh                 # UPDATE SCRIPT
     └── docker-compose.yml        # DOCKER COMPOSE
+```
+
+## 🛠 Installation & Bootstrap
+
+After cloning the repository, you need to perform a one-time manual bootstrap to initialize the environment and the master update script.
+
+### 1. Configure Secrets
+Copy the provided template to create your local environment file (which is safely ignored by Git):
+```bash
+cp .env .env.local
+nano .env.local
+```
+Inside the editor, add your actual Cloudflare token:
+```ini
+TUNNEL_TOKEN=your_actual_token_here
+```
+
+### 2. Manual Bootstrap
+Run the following commands from inside the `hosting-core` directory to propagate the global configuration and the master script to the parent directory:
+```bash
+cp global.env ../.env
+cp global.update.sh ../update.sh
+chmod +x ../update.sh
+```
+
+### 3. First Execution
+Move to the parent directory and start the infrastructure using the newly copied master script:
+```bash
+cd ..
+./update.sh
+```
