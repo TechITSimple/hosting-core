@@ -1,4 +1,6 @@
 #!/bin/bash
+# MANAGED BY TIS CORE - DO NOT EDIT THIS LINE
+
 set -e
 
 FORCE_UPDATE=0
@@ -8,13 +10,20 @@ fi
 
 REPO_NAME=$(basename "$PWD")
 
+# --- COLD START CHECK ---
+# Check if any container for this project is currently defined (running or stopped)
+# If 'docker compose ps -q' returns an empty string, the project has never been started.
+if [ -z "$(docker compose ps -q 2>/dev/null)" ]; then
+    echo "[$REPO_NAME]  🚀 Cold start detected (no containers found). Forcing initial build..."
+    FORCE_UPDATE=1
+fi
+
 echo "[$REPO_NAME]  🔄 Checking for updates..."
 
 # --- PRE-UPDATE HOOK ---
 if [ -f "pre-update.sh" ]; then
     echo "[$REPO_NAME]  🔗 Executing pre-update hook..."
-    # 'source' runs the script in the current shell context
-    source pre-update.sh 
+    source pre-update.sh
 fi
 
 LOCAL_COMMIT=$(git rev-parse HEAD)
