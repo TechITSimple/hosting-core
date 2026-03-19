@@ -2,7 +2,6 @@
 set -e
 
 FORCE_UPDATE=0
-# Use $* to check all arguments for the force flags
 if [[ "$*" == *"--force"* || "$*" == *"-f"* ]]; then
     FORCE_UPDATE=1
 fi
@@ -10,6 +9,13 @@ fi
 REPO_NAME=$(basename "$PWD")
 
 echo "[$REPO_NAME]  🔄 Checking for updates..."
+
+# --- PRE-UPDATE HOOK ---
+if [ -f "pre-update.sh" ]; then
+    echo "[$REPO_NAME]  🔗 Executing pre-update hook..."
+    # 'source' runs the script in the current shell context
+    source pre-update.sh 
+fi
 
 LOCAL_COMMIT=$(git rev-parse HEAD)
 git pull > /dev/null
@@ -22,9 +28,13 @@ if [ "$LOCAL_COMMIT" = "$REMOTE_COMMIT" ] && [ "$FORCE_UPDATE" -eq 0 ]; then
 fi
 
 echo "[$REPO_NAME]  🏗️ Processing containers..."
-# Redirect stdout to /dev/null to keep it clean.
-# Stderr is NOT redirected, so build errors or compose warnings will still show up.
 docker compose up -d --build > /dev/null
+
+# --- POST-UPDATE HOOK ---
+if [ -f "post-update.sh" ]; then
+    echo "[$REPO_NAME]  🔗 Executing post-update hook..."
+    source post-update.sh
+fi
 
 echo "[$REPO_NAME]  ✅ Update complete."
 echo ""
