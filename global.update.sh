@@ -67,12 +67,19 @@ if [ "$CORE_CHANGED" -eq 1 ] || [ "$GLOBAL_ENV_CHANGED" -eq 1 ]; then
     CORE_ARGS="$CORE_ARGS --force"
 fi
 
-echo ">>> [Master] UPDATING CORE CONTAINERS"
-./update.sh $CORE_ARGS
-
-echo ">>> [Master] UPDATING SATELLITE WEBSITES"
+echo ">>> [Master]  MANAGING AND UPDATING SATELLITE WEBSITES"
 for dir in ../*/; do
-    if [ -f "${dir}update.sh" ] && [ "$(basename "$dir")" != "hosting-core" ]; then
+    SATELLITE_NAME=$(basename "$dir")
+    
+    if [ "$SATELLITE_NAME" != "hosting-core" ]; then
+        TARGET_UPDATE="${dir}update.sh"
+        
+        # Unconditionally sync the universal update script to all satellites
+        # This ensures every site benefits from core script improvements
+        cp update.sh "$TARGET_UPDATE"
+        chmod +x "$TARGET_UPDATE"
+
+        # Execute the satellite update process
         (cd "$dir" && ./update.sh $SATELLITE_ARGS)
     fi
 done
