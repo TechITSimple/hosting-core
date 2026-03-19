@@ -21,9 +21,12 @@ To maintain security and avoid nested Git repositories, follow this structure:
 |   ├── update.sh                 # UPDATE SCRIPT
 │   └── docker-compose.yml        # DOCKER COMPOSE
 └── [website]/                # WEBSITE REPOSITORY (One for each website)
+    ├── .gitignore                # GITIGNORE (must include .env.local and update.sh)
     ├── .env                      # SECRET CONFIG TEMPLATE (Pushed to GitHub, locally copy to .env.local and add secrets)
     ├── .env.local                # SECRET CONFIG (Manually written from .env and not pushed to GitHub)
-    ├── update.sh                 # UPDATE SCRIPT
+    ├── update.sh                 # UPDATE SCRIPT (Automatically copied from this repo's update.sh)
+    ├── pre-update.sh             # PRE-UPDATE SCRIPT (Optional hook pre-update)
+    ├── post-update.sh            # POST-UPDATE SCRIPT (Optional hook post-update)
     └── docker-compose.yml        # DOCKER COMPOSE
 ```
 
