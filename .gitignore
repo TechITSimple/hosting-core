@@ -8,7 +8,7 @@
 !/README.md
 !/docker-compose.yml
 !/update.sh
-!/.env
+!/template.env
 !/global.env
 !/global.update.sh
 
@@ -17,7 +17,6 @@
 /*/
 
 # Security: Ensure secret local envs never get tracked
-.env.local
-.env.*.local
+.env*
 *.log
 .DS_Store
