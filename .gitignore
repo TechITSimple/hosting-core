@@ -8,7 +8,7 @@
 !/README.md
 !/docker-compose.yml
 !/update.sh
-!/post_update.sh
+!/post-update.sh
 !/template.env
 !/global.env
 !/manager.sh
