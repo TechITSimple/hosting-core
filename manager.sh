@@ -1,30 +1,23 @@
 #!/bin/bash
 set -e
 
-# 1. PATH RESOLUTION (Improved Detection)
+# 1. PATH RESOLUTION
+# Detect if running from the environment root or inside hosting-core
 REAL_SCRIPT_PATH=$(readlink -f "$0")
 CURRENT_DIR_NAME=$(basename "$(dirname "$REAL_SCRIPT_PATH")")
 
 if [ "$CURRENT_DIR_NAME" == "hosting-core" ]; then
-    # Running from MASTER (inside hosting-core)
     CORE_DIR=$(dirname "$REAL_SCRIPT_PATH")
     ENV_DIR=$(dirname "$CORE_DIR")
 else
-    # Running from PROXY (environment root)
     ENV_DIR=$(dirname "$REAL_SCRIPT_PATH")
     CORE_DIR="$ENV_DIR/hosting-core"
 fi
 
 MACRO_ENV=$(basename "$ENV_DIR")
 
-# Debug per sicurezza (puoi rimuoverlo dopo il primo test)
-# echo "DEBUG: CORE=$CORE_DIR | ENV=$ENV_DIR"
-
-# Forza l'esecuzione dalla CORE_DIR per i comandi Git
-cd "$CORE_DIR"
-
 # ---------------------------------------------------------
-# UTILITY: Interactive .env Builder (Fixed Stdin)
+# UTILITY: Interactive .env Builder
 # ---------------------------------------------------------
 build_env_interactively() {
     local target_dir=$1
@@ -52,7 +45,7 @@ build_env_interactively() {
         fi
 
         local user_val=""
-        # CRITICAL FIX: Redirect stdin from /dev/tty to allow user input during file read loop
+        # Read from /dev/tty to ensure input works inside loops
         if [ -n "$current_val" ]; then
             read -p "🔑 $key [$current_val]: " user_val < /dev/tty
             user_val="${user_val:-$current_val}"
@@ -71,10 +64,6 @@ build_env_interactively() {
 # COMMAND TARGET ROUTING
 # ---------------------------------------------------------
 
-# ---------------------------------------------------------
-# COMMAND TARGET ROUTING
-# ---------------------------------------------------------
-
 do_update_single() {
     local site_name=$1
     local force_flag=$2
@@ -84,20 +73,59 @@ do_update_single() {
     echo "🔄 UPDATING SATELLITE: $site_name"
     echo "========================================="
     
-    # 1. Sync and set executable for the main update script
+    # Propagate latest update.sh and ensure it's executable
     cp "$CORE_DIR/update.sh" "$target_dir/update.sh"
     chmod +x "$target_dir/update.sh"
 
-    # 2. Automatically detect and set executable for local hooks if they exist
+    # Set executable for hooks if they exist
     for hook in "pre-update.sh" "post-update.sh"; do
         if [ -f "$target_dir/$hook" ]; then
-            echo "[Manager] 🔗 Making hook executable: $hook"
             chmod +x "$target_dir/$hook"
         fi
     done
 
-    # 3. Delegate execution
     (cd "$target_dir" && ./update.sh $force_flag)
+}
+
+do_update_all() {
+    local force_flag=$1
+    
+    echo "========================================="
+    echo "🌐 TIS SATELLITE UPDATE-ALL ($MACRO_ENV)"
+    echo "========================================="
+
+    # 1. Update Core Logic via Git (pulls manager and update scripts)
+    cd "$CORE_DIR"
+    sudo -u tis git pull > /dev/null
+
+    # 2. Propagate Global Env and Manager to environment root
+    local target_env="$ENV_DIR/.env"
+    if [ ! -f "$target_env" ] || ! cmp -s "$CORE_DIR/global.env" "$target_env"; then
+        echo "[Manager] ⚠️ Global .env synced to root."
+        cp "$CORE_DIR/global.env" "$target_env"
+    fi
+    
+    local master_manager="$CORE_DIR/manager.sh"
+    local proxy_manager="$ENV_DIR/manager.sh"
+    
+    if [ "$REAL_SCRIPT_PATH" != "$proxy_manager" ]; then
+        echo "[Manager] 🔄 Upgrading root manager script..."
+        cp "$master_manager" "$proxy_manager"
+        chmod +x "$proxy_manager"
+    fi
+
+    # 3. Apply Satellite Updates (Excluding Core container update)
+    echo "[Manager] 🚀 Updating all satellites..."
+    for dir in "$ENV_DIR"/*/; do
+        local dir_name=$(basename "$dir")
+        if [ "$dir_name" != "hosting-core" ] && [ -d "$dir" ]; then
+            do_update_single "$dir_name" "$force_flag"
+        fi
+    done
+
+    echo "[Manager] 🧹 Cleaning up Docker system..."
+    docker image prune -f > /dev/null
+    echo "✅ Satellites update complete. (Core infrastructure untouched)"
 }
 
 do_install() {
@@ -134,65 +162,6 @@ do_edit() {
     do_update_single "$site_name" "--force"
 }
 
-do_update_all() {
-    local force_flag=$1
-    
-    echo "========================================="
-    echo "🌐 TIS MASTER UPDATE-ALL ($MACRO_ENV)"
-    echo "========================================="
-
-    # 1. Update Core via Git
-    local local_commit=$(git rev-parse HEAD)
-    sudo -u tis git pull > /dev/null
-    local remote_commit=$(git rev-parse HEAD)
-
-    local core_args="$force_flag"
-    if [ "$local_commit" != "$remote_commit" ]; then
-        echo "[Manager] 📦 Core repository updated."
-        core_args="--force"
-    fi
-
-    # 2. Propagate Global Env and Manager to parent
-    if [ -f "$ENV_DIR/.env" ]; then
-        if ! cmp -s "$CORE_DIR/global.env" "$ENV_DIR/.env"; then
-            echo "[Manager] ⚠️ Global .env changed. Forcing rebuild."
-            cp "$CORE_DIR/global.env" "$ENV_DIR/.env"
-            force_flag="--force"
-            core_args="--force"
-        fi
-    else
-        echo "[Manager] 🆕 Initializing global .env..."
-        cp "$CORE_DIR/global.env" "$ENV_DIR/.env"
-    fi
-    
-    # Sincronizza il manager.sh stesso nella cartella superiore
-    cp "$REAL_SCRIPT_PATH" "$ENV_DIR/manager.sh"
-    chmod +x "$ENV_DIR/manager.sh"
-
-    # 3. Apply Core Updates
-    echo "[Manager] 🏗️ Delegating update to Core..."
-    ./update.sh $core_args
-
-    # 4. Apply Satellite Updates
-    echo "[Manager] 🚀 Delegating updates to all Satellites..."
-    for dir in "$ENV_DIR"/*/; do
-        local dir_name=$(basename "$dir")
-        # SALTA la cartella hosting-core confrontando il nome della cartella
-        if [ "$dir_name" != "hosting-core" ] && [ -d "$dir" ]; then
-            local target_update="${dir}update.sh"
-            
-            cp "$CORE_DIR/update.sh" "$target_update"
-            chmod +x "$target_update"
-
-            (cd "$dir" && ./update.sh $force_flag)
-        fi
-    done
-
-    echo "[Manager] 🧹 Cleaning up Docker system..."
-    docker image prune -f > /dev/null
-    echo "✅ Update-All complete."
-}
-
 # ---------------------------------------------------------
 # MAIN ROUTING LOGIC
 # ---------------------------------------------------------
@@ -210,14 +179,11 @@ if [[ "$COMMAND" =~ ^(edit|update|force-update)$ ]] && [ ! -d "$ENV_DIR/$TARGET"
 fi
 
 case "$COMMAND" in
-    install)          do_install "$TARGET" ;;
-    edit)             do_edit "$TARGET" ;;
-    update)           do_update_single "$TARGET" "" ;;
-    force-update)     do_update_single "$TARGET" "--force" ;;
+    install)          do_update_all ""; do_install "$2" ;; # Ensure scripts are fresh before install
+    edit)             do_edit "$2" ;;
+    update)           do_update_single "$2" "" ;;
+    force-update)     do_update_single "$2" "--force" ;;
     update-all)       do_update_all "" ;;
     force-update-all) do_update_all "--force" ;;
-    *)
-        echo "❌ Unknown command: $COMMAND"
-        exit 1
-        ;;
+    *)                echo "❌ Unknown command"; exit 1 ;;
 esac
