@@ -43,33 +43,78 @@ To prevent accidental leaks of credentials:
 
 ## 🛠 Installation & Bootstrap
 
-When setting up a new macro-environment (e.g., `/home/tis/websites/new-env/`), clone this repository into it and perform a one-time manual bootstrap.
-
-### 1. Configure Secrets
-Navigate to the `hosting-core` directory and create your local secrets file:
 ```bash
-cd /home/tis/websites/[environment-name]/hosting-core
-cp template.env .env
-nano .env
-```
-Add your actual Cloudflare token for this specific environment:
-```ini
-TUNNEL_TOKEN=your_actual_token_here
+nano /home/tis/websites/setup-env.sh
 ```
 
-### 2. Manual Bootstrap
-Run the following commands from inside the `hosting-core` directory to propagate the global configuration and the master script to the parent environment directory:
+Copy-paste the following code:
 ```bash
-cp global.env ../.env
-cp global.update.sh ../update.sh
-chmod +x ../update.sh
+#!/bin/bash
+set -e
+
+# Check if environment name is provided
+if [ -z "$1" ]; then
+    echo "❌ Error: Please provide an environment name."
+    echo "Usage: ./setup-env.sh <environment-name>"
+    echo "Example: ./setup-env.sh clients-prod"
+    exit 1
+fi
+
+ENV_NAME=$1
+TARGET_DIR="/home/tis/websites/$ENV_NAME"
+
+echo "========================================="
+echo "🏗️ BOOTSTRAPPING ENVIRONMENT: $ENV_NAME"
+echo "========================================="
+
+# 1. Create the macro-environment directory
+if [ -d "$TARGET_DIR" ]; then
+    echo "❌ Error: Directory $TARGET_DIR already exists."
+    exit 1
+fi
+
+echo "[Installer] 📁 Creating directory: $TARGET_DIR"
+mkdir -p "$TARGET_DIR"
+
+# 2. Clone the hosting-core repository
+echo "[Installer] 📥 Cloning hosting-core repository..."
+cd "$TARGET_DIR"
+# Clone using the 'tis' service user to ensure correct SSH key usage
+sudo -u tis git clone git@github.com:TechITSimple/hosting-core.git hosting-core
+
+# 3. Apply correct ownership and permissions
+echo "[Installer] 🔐 Applying permissions (tis:web-admins)..."
+sudo chown -R tis:web-admins "$TARGET_DIR"
+sudo chmod -R 775 "$TARGET_DIR"
+
+# Ensure setgid bit is applied so future files inherit the web-admins group
+sudo find "$TARGET_DIR" -type d -exec chmod g+s {} +
+
+# 4. Bootstrap files to the environment root
+echo "[Installer] ⚙️ Setting up manager.sh and global configs..."
+cp hosting-core/global.env .env
+cp hosting-core/manager.sh manager.sh
+chmod +x manager.sh
+
+# 5. Prepare the local secret template for the tunnel
+echo "[Installer] 📝 Initializing tunnel configuration..."
+if [ -f "hosting-core/template.env" ]; then
+    cp hosting-core/template.env hosting-core/.env
+fi
+
+echo "========================================="
+echo "✅ ENVIRONMENT '$ENV_NAME' READY!"
+echo "========================================="
+echo "Next steps:"
+echo "1. cd $TARGET_DIR"
+echo "2. Edit the tunnel token: nano hosting-core/.env"
+echo "3. Start the core: ./manager.sh update-all"
 ```
 
-### 3. First Execution
-Move to the parent directory and start the infrastructure using the newly copied master script. This will set up the isolated network, start the Cloudflare tunnel, and update any satellites present:
+and finally:
 ```bash
-cd ..
-./update.sh
+chmod +x /home/tis/websites/setup-env.sh
+./home/tis/websites/setup-env.sh
 ```
 
 ## 🛰 Connecting Satellites
