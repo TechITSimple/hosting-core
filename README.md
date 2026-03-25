@@ -1,52 +1,64 @@
 # hosting-core 🚀
 
-This repository contains the core infrastructure for the **TechItSimple (TIS)** VPS environment. It acts as the central hub for shared networking and secure connectivity, allowing multiple standalone services (satellites) to communicate and be exposed through a single Cloudflare Tunnel.
+This repository contains the core infrastructure for the **TechItSimple (TIS)** VPS environments. It acts as the central engine for a specific "macro-environment" (e.g., Production, Testing), providing shared networking and secure connectivity via a dedicated Cloudflare Tunnel.
 
-## 🏗 System Architecture
+## 🏗 System Architecture & Isolation
 
-The infrastructure is designed to be modular. Each website or service lives in its own repository, while `hosting-core` provides the shared resources.
+To ensure maximum security and prevent conflicts, the server is divided into isolated **macro-environments** (e.g., `personal-prod`, `clients-test`). 
+
+Each macro-environment contains its own clone of this `hosting-core` repository and its own set of satellite websites. The update scripts dynamically generate Docker network names and container prefixes based on the folder structure, ensuring that a test site can **never** accidentally interact with a production database.
 
 ### Filesystem Layout
-To maintain security and avoid nested Git repositories, follow this structure:
+
+Follow this exact structure for each environment to maintain isolation and avoid nested Git repositories:
 
 ```text
-/home/tis/websites/
-├── .env                      # SHARED CONFIG (Automatically copied from this repo's global.env)
-├── update.sh                 # UPDATE SCRIPT (Automatically copied from this repo's global.update.sh)
-├── hosting-core/             # THIS REPOSITORY (Network & Tunnel)
-│   ├── global.env                # SHARED CONFIG (Automatically copied to parent .env)
-│   ├── global.update.sh          # UPDATE SCRIPT (Automatically copied to parent update.sh)
-|   ├── .env                      # SECRET CONFIG TEMPLATE (Pushed to GitHub, locally copy to .env.local and add secrets)
-|   ├── .env.local                # SECRET CONFIG (Manually written from .env and not pushed to GitHub)
-|   ├── update.sh                 # UPDATE SCRIPT
-│   └── docker-compose.yml        # DOCKER COMPOSE
-└── [website]/                # WEBSITE REPOSITORY (One for each website)
-    ├── .gitignore                # GITIGNORE (must include .env*.local and update.sh)
-    ├── .env                      # SECRET CONFIG TEMPLATE (Pushed to GitHub, locally copy to .env.local and add secrets)
-    ├── .env.local                # SECRET CONFIG (Manually written from .env and not pushed to GitHub)
-    ├── update.sh                 # UPDATE SCRIPT (Automatically copied from this repo's update.sh)
-    ├── pre-update.sh             # PRE-UPDATE SCRIPT (Optional hook pre-update)
-    ├── post-update.sh            # POST-UPDATE SCRIPT (Optional hook post-update)
-    └── docker-compose.yml        # DOCKER COMPOSE
+/home/tis/websites/[ENV]/  <-- e.g., personal-prod, clients-test
+├── .env                      # SHARED GLOBAL CONFIG (Auto-copied from core's global.env)
+├── update.sh                 # MACRO-ENV UPDATE SCRIPT (Auto-copied from core's global.update.sh)
+│
+├── hosting-core/             # THIS REPOSITORY (The "Engine" of the environment)
+│   ├── global.env                # SHARED CONFIG TEMPLATE (Auto-copied to parent ../.env)
+│   ├── global.update.sh          # MASTER SCRIPT TEMPLATE (Auto-copied to parent ../update.sh)
+│   ├── template.env              # SECRET CONFIG TEMPLATE (Pushed to GitHub)
+│   ├── .env                      # SECRET CONFIG (Manually written, ignored by Git)
+│   ├── update.sh                 # CORE UPDATE SCRIPT
+│   └── docker-compose.yml        # CLOUDFLARE TUNNEL & DYNAMIC NETWORK
+│
+└── [website-satellite]/      # WEBSITE REPOSITORY (One for each website in this env)
+    ├── .gitignore                # MUST ignore .env and auto-generated update.sh
+    ├── template.env              # SECRET CONFIG TEMPLATE (Pushed to GitHub)
+    ├── .env                      # SECRET CONFIG (Manually written, ignored by Git)
+    ├── update.sh                 # UPDATE SCRIPT (Auto-managed by the core script)
+    ├── pre-update.sh             # PRE-UPDATE SCRIPT (Optional hook)
+    ├── post-update.sh            # POST-UPDATE SCRIPT (Optional hook)
+    └── docker-compose.yml        # WP & DB CONFIG
 ```
+
+## 🔐 Secrets Management (`template.env` vs `.env`)
+
+To prevent accidental leaks of credentials:
+* **`template.env`**: Tracked by Git. Contains empty variables or safe defaults.
+* **`.env`**: **Ignored by Git**. You must manually create this file by copying `template.env` and filling in the actual secrets (passwords, tokens).
 
 ## 🛠 Installation & Bootstrap
 
-After cloning the repository, you need to perform a one-time manual bootstrap to initialize the environment and the master update script.
+When setting up a new macro-environment (e.g., `/home/tis/websites/new-env/`), clone this repository into it and perform a one-time manual bootstrap.
 
 ### 1. Configure Secrets
-Copy the provided template to create your local environment file (which is safely ignored by Git):
+Navigate to the `hosting-core` directory and create your local secrets file:
 ```bash
-cp .env .env.local
-nano .env.local
+cd /home/tis/websites/[environment-name]/hosting-core
+cp template.env .env
+nano .env
 ```
-Inside the editor, add your actual Cloudflare token:
+Add your actual Cloudflare token for this specific environment:
 ```ini
 TUNNEL_TOKEN=your_actual_token_here
 ```
 
 ### 2. Manual Bootstrap
-Run the following commands from inside the `hosting-core` directory to propagate the global configuration and the master script to the parent directory:
+Run the following commands from inside the `hosting-core` directory to propagate the global configuration and the master script to the parent environment directory:
 ```bash
 cp global.env ../.env
 cp global.update.sh ../update.sh
@@ -54,8 +66,23 @@ chmod +x ../update.sh
 ```
 
 ### 3. First Execution
-Move to the parent directory and start the infrastructure using the newly copied master script:
+Move to the parent directory and start the infrastructure using the newly copied master script. This will set up the isolated network, start the Cloudflare tunnel, and update any satellites present:
 ```bash
 cd ..
 ./update.sh
 ```
+
+## 🛰 Connecting Satellites
+
+Because networks are generated dynamically (e.g., `personal-prod-net`), satellite `docker-compose.yml` files must reference the network using the injected `${NETWORK_NAME}` variable.
+
+Add this at the bottom of your satellite's `docker-compose.yml`:
+
+```yaml
+networks:
+  tis_proxy:
+    name: ${NETWORK_NAME}
+    external: true
+```
+
+*Note: The `update.sh` script automatically handles the injection of `${NETWORK_NAME}` and `${COMPOSE_PROJECT_NAME}` into the Docker environment before running `docker compose up`.*
