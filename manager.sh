@@ -1,13 +1,26 @@
 #!/bin/bash
 set -e
 
-# 1. PATH RESOLUTION
+# 1. PATH RESOLUTION (Improved Detection)
 REAL_SCRIPT_PATH=$(readlink -f "$0")
-CORE_DIR=$(dirname "$REAL_SCRIPT_PATH")
-ENV_DIR=$(dirname "$CORE_DIR")
+CURRENT_DIR_NAME=$(basename "$(dirname "$REAL_SCRIPT_PATH")")
+
+if [ "$CURRENT_DIR_NAME" == "hosting-core" ]; then
+    # Running from MASTER (inside hosting-core)
+    CORE_DIR=$(dirname "$REAL_SCRIPT_PATH")
+    ENV_DIR=$(dirname "$CORE_DIR")
+else
+    # Running from PROXY (environment root)
+    ENV_DIR=$(dirname "$REAL_SCRIPT_PATH")
+    CORE_DIR="$ENV_DIR/hosting-core"
+fi
+
 MACRO_ENV=$(basename "$ENV_DIR")
 
-# Forza l'esecuzione dalla CORE_DIR per coerenza con Git e Docker
+# Debug per sicurezza (puoi rimuoverlo dopo il primo test)
+# echo "DEBUG: CORE=$CORE_DIR | ENV=$ENV_DIR"
+
+# Forza l'esecuzione dalla CORE_DIR per i comandi Git
 cd "$CORE_DIR"
 
 # ---------------------------------------------------------
