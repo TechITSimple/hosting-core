@@ -10,7 +10,7 @@
 !/update.sh
 !/template.env
 !/global.env
-!/global.update.sh
+!/manager.sh
 
 # Explicitly ignore all directories and their content
 # This ensures that any future config folder stays local-only
