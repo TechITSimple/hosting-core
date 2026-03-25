@@ -24,7 +24,7 @@ MACRO_ENV=$(basename "$ENV_DIR")
 cd "$CORE_DIR"
 
 # ---------------------------------------------------------
-# UTILITY: Interactive .env Builder
+# UTILITY: Interactive .env Builder (Fixed Stdin)
 # ---------------------------------------------------------
 build_env_interactively() {
     local target_dir=$1
@@ -52,11 +52,12 @@ build_env_interactively() {
         fi
 
         local user_val=""
+        # CRITICAL FIX: Redirect stdin from /dev/tty to allow user input during file read loop
         if [ -n "$current_val" ]; then
-            read -p "🔑 $key [$current_val]: " user_val
+            read -p "🔑 $key [$current_val]: " user_val < /dev/tty
             user_val="${user_val:-$current_val}"
         else
-            read -p "🔑 $key []: " user_val
+            read -p "🔑 $key []: " user_val < /dev/tty
         fi
 
         echo "${key}=${user_val}" >> "$temp_env"
@@ -69,6 +70,35 @@ build_env_interactively() {
 # ---------------------------------------------------------
 # COMMAND TARGET ROUTING
 # ---------------------------------------------------------
+
+# ---------------------------------------------------------
+# COMMAND TARGET ROUTING
+# ---------------------------------------------------------
+
+do_update_single() {
+    local site_name=$1
+    local force_flag=$2
+    local target_dir="$ENV_DIR/$site_name"
+
+    echo "========================================="
+    echo "🔄 UPDATING SATELLITE: $site_name"
+    echo "========================================="
+    
+    # 1. Sync and set executable for the main update script
+    cp "$CORE_DIR/update.sh" "$target_dir/update.sh"
+    chmod +x "$target_dir/update.sh"
+
+    # 2. Automatically detect and set executable for local hooks if they exist
+    for hook in "pre-update.sh" "post-update.sh"; do
+        if [ -f "$target_dir/$hook" ]; then
+            echo "[Manager] 🔗 Making hook executable: $hook"
+            chmod +x "$target_dir/$hook"
+        fi
+    done
+
+    # 3. Delegate execution
+    (cd "$target_dir" && ./update.sh $force_flag)
+}
 
 do_install() {
     local repo_name=$1
@@ -85,11 +115,9 @@ do_install() {
     sudo chmod -R 775 "$repo_name"
 
     build_env_interactively "$target_dir"
-
-    cp "$CORE_DIR/update.sh" "$target_dir/update.sh"
-    chmod +x "$target_dir/update.sh"
-
-    (cd "$target_dir" && ./update.sh --force)
+    
+    # Use the common update logic to handle script injection and hooks
+    do_update_single "$repo_name" "--force"
 }
 
 do_edit() {
@@ -101,22 +129,9 @@ do_edit() {
     echo "========================================="
     
     build_env_interactively "$target_dir"
-    (cd "$target_dir" && ./update.sh --force)
-}
-
-do_update_single() {
-    local site_name=$1
-    local force_flag=$2
-    local target_dir="$ENV_DIR/$site_name"
-
-    echo "========================================="
-    echo "🔄 UPDATING SATELLITE: $site_name"
-    echo "========================================="
     
-    cp "$CORE_DIR/update.sh" "$target_dir/update.sh"
-    chmod +x "$target_dir/update.sh"
-
-    (cd "$target_dir" && ./update.sh $force_flag)
+    # Re-apply update with force to propagate .env changes
+    do_update_single "$site_name" "--force"
 }
 
 do_update_all() {
