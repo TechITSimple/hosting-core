@@ -183,7 +183,7 @@ if [[ "$COMMAND" =~ ^(edit|update|force-update)$ ]] && [ ! -d "$ENV_DIR/$TARGET"
 fi
 
 case "$COMMAND" in
-    install)          do_update_all ""; do_install "$2" ;; # Ensure scripts are fresh before install
+    install)          do_update_all ""; do_install "$2" ;; 
     edit)             do_edit "$2" ;;
     update)           do_update_single "$2" "" ;;
     force-update)     do_update_single "$2" "--force" ;;
