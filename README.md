@@ -114,7 +114,15 @@ echo "3. Start the core: ./manager.sh update-all"
 and finally:
 ```bash
 chmod +x /home/tis/websites/setup-env.sh
-./home/tis/websites/setup-env.sh
+```
+
+## 🚀 Quick Environment Setup
+
+To initialize a brand new macro-environment on the VPS, use the root setup script. This will automatically create the folder, clone this repository, and set up the necessary file permissions.
+
+```bash
+cd /home/tis/websites/
+./setup-env.sh new-environment-name
 ```
 
 ## 🛰 Connecting Satellites
