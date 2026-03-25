@@ -28,7 +28,8 @@ echo "[$SITE_NAME] 🔄 Checking for updates..."
 
 # 3. PRE-UPDATE HOOK
 if [ -f "pre-update.sh" ]; then
-    echo "[$SITE_NAME] 🔗 Executing pre-update hook..."
+    echo "[$SITE_NAME] 🔗 Preparing and executing pre-update hook..."
+    sudo chmod +x pre-update.sh
     source pre-update.sh
 fi
 
@@ -50,7 +51,8 @@ docker compose up -d --build > /dev/null
 
 # 6. POST-UPDATE HOOK
 if [ -f "post-update.sh" ]; then
-    echo "[$SITE_NAME] 🔗 Executing post-update hook..."
+    echo "[$SITE_NAME] 🔗 Preparing and executing post-update hook..."
+    sudo chmod +x post-update.sh
     source post-update.sh
 fi
 
