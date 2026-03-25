@@ -1,23 +1,22 @@
-# /home/tis/websites/hosting-core/docker-compose.yml
+# /home/tis/websites/[ENV]/hosting-core/docker-compose.yml
 
 services:
   tunnel:
     image: cloudflare/cloudflared:latest
-    container_name: cloudflared-tunnel
+    container_name: ${COMPOSE_PROJECT_NAME}-tunnel
     restart: always
-    # The Cloudflare Tunnel automatically looks for the TUNNEL_TOKEN environment variable.
-    # We load global variables (e.g., TZ, PUID) from the parent directory's .env file,
-    # and secret variables (e.g., TUNNEL_TOKEN) from the local .env.local file.
+    
     env_file:
       - ../.env
-      - .env.local
+  
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+      
     command: tunnel run
     networks:
       - tis_proxy
 
-# Define the shared network that satellite websites will use to communicate with the tunnel.
-# In satellite docker-compose.yml files, this network must be declared with 'external: true'.
 networks:
   tis_proxy:
-    name: tis_proxy
+    name: ${NETWORK_NAME}
     driver: bridge
