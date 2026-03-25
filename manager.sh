@@ -2,11 +2,8 @@
 set -e
 
 # 1. PATH RESOLUTION
-# Risolve il percorso assoluto dello script per evitare ambiguità
 REAL_SCRIPT_PATH=$(readlink -f "$0")
-# La CORE_DIR è la cartella dove risiede fisicamente manager.sh (hosting-core)
 CORE_DIR=$(dirname "$REAL_SCRIPT_PATH")
-# La ENV_DIR è la cartella del macro-ambiente (quella superiore)
 ENV_DIR=$(dirname "$CORE_DIR")
 MACRO_ENV=$(basename "$ENV_DIR")
 
@@ -152,7 +149,7 @@ do_update_all() {
     echo "[Manager] 🚀 Delegating updates to all Satellites..."
     for dir in "$ENV_DIR"/*/; do
         local dir_name=$(basename "$dir")
-        # SALTA la cartella hosting-core per evitare l'errore "same file"
+        # SALTA la cartella hosting-core confrontando il nome della cartella
         if [ "$dir_name" != "hosting-core" ] && [ -d "$dir" ]; then
             local target_update="${dir}update.sh"
             
@@ -174,7 +171,6 @@ do_update_all() {
 COMMAND=$1
 TARGET=$2
 
-# Validazione parametri
 if [[ "$COMMAND" =~ ^(install|edit|update|force-update)$ ]] && [ -z "$TARGET" ]; then
     echo "❌ Error: You must specify a target site for the '$COMMAND' command."
     exit 1
@@ -193,8 +189,7 @@ case "$COMMAND" in
     update-all)       do_update_all "" ;;
     force-update-all) do_update_all "--force" ;;
     *)
-        echo "❌ Unknown or missing command."
-        echo "Available commands: install, edit, update, force-update, update-all, force-update-all"
+        echo "❌ Unknown command: $COMMAND"
         exit 1
         ;;
 esac
