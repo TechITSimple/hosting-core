@@ -182,23 +182,24 @@ do_remove() {
     fi
 
     echo "⚠️  WARNING: You are about to PERMANENTLY remove '$site_name'."
-    echo "This will stop containers, delete volumes (DB data), and remove all files."
     read -p "Are you absolutely sure? [y/N]: " confirm < /dev/tty
-    
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
         echo "❌ Aborted."
         exit 0
     fi
 
-    echo "[Manager] 🛑 Stopping containers and removing volumes..."
+    echo "[Manager] 🛑 Stopping containers for $site_name..."
     if [ -f "$target_dir/docker-compose.yml" ]; then
+        # IMPORTANT: We must export the same project name used during install/update
+        export COMPOSE_PROJECT_NAME="${MACRO_ENV}-${site_name}"
+        export NETWORK_NAME="${MACRO_ENV}-net"
+        
         (cd "$target_dir" && docker compose down -v)
     fi
 
     echo "[Manager] 🗑️  Deleting directory: $target_dir"
     sudo rm -rf "$target_dir"
-
-    echo "✅ '$site_name' has been completely removed."
+    echo "✅ '$site_name' removed successfully."
 }
 
 # ---------------------------------------------------------
