@@ -17,7 +17,7 @@ fi
 MACRO_ENV=$(basename "$ENV_DIR")
 
 # ---------------------------------------------------------
-# UTILITY: Interactive .env Builder
+# UTILITY: Smart Interactive .env Builder
 # ---------------------------------------------------------
 build_env_interactively() {
     local target_dir=$1
@@ -32,28 +32,33 @@ build_env_interactively() {
     > "$temp_env"
 
     while IFS= read -r line || [ -n "$line" ]; do
+        # Preserve comments and empty lines
         if [[ -z "$line" || "$line" == \#* ]]; then
             echo "$line" >> "$temp_env"
             continue
         fi
 
+        # Extract key and default value from template.env
         local key=$(echo "$line" | cut -d '=' -f 1)
+        local default_val=$(echo "$line" | cut -d '=' -f 2- || true)
+        
         local current_val=""
-
+        # Extract existing value from .env if it exists
         if [ -f "$target_dir/.env" ]; then
             current_val=$(grep "^${key}=" "$target_dir/.env" | cut -d '=' -f 2- || true)
         fi
 
-        local user_val=""
-        # Read from /dev/tty to ensure input works inside loops
-        if [ -n "$current_val" ]; then
-            read -p "🔑 $key [$current_val]: " user_val < /dev/tty
-            user_val="${user_val:-$current_val}"
-        else
-            read -p "🔑 $key []: " user_val < /dev/tty
-        fi
+        # Priority: Current value (if editing) > Default value (from template)
+        local suggested_val="${current_val:-$default_val}"
 
-        echo "${key}=${user_val}" >> "$temp_env"
+        local user_val=""
+        # Read user input from /dev/tty to avoid stdin conflicts
+        read -p "🔑 $key [$suggested_val]: " user_val < /dev/tty
+        
+        # Fallback to suggested_val if user input is empty (just pressed Enter)
+        local final_val="${user_val:-$suggested_val}"
+
+        echo "${key}=${final_val}" >> "$temp_env"
     done < "$target_dir/template.env"
 
     mv "$temp_env" "$target_dir/.env"
@@ -61,9 +66,8 @@ build_env_interactively() {
 }
 
 # ---------------------------------------------------------
-# COMMAND TARGET ROUTING
+# SATELLITE UPDATE (With Sudo for Hooks)
 # ---------------------------------------------------------
-
 do_update_single() {
     local site_name=$1
     local force_flag=$2
@@ -73,14 +77,14 @@ do_update_single() {
     echo "🔄 UPDATING SATELLITE: $site_name"
     echo "========================================="
     
-    # Propagate latest update.sh and ensure it's executable
     cp "$CORE_DIR/update.sh" "$target_dir/update.sh"
-    chmod +x "$target_dir/update.sh"
+    sudo chmod +x "$target_dir/update.sh"
 
-    # Set executable for hooks if they exist
+    # Use sudo for hooks as they might be owned by 'tis' user
     for hook in "pre-update.sh" "post-update.sh"; do
         if [ -f "$target_dir/$hook" ]; then
-            chmod +x "$target_dir/$hook"
+            echo "[Manager] 🔗 Setting permissions for hook: $hook"
+            sudo chmod +x "$target_dir/$hook"
         fi
     done
 
