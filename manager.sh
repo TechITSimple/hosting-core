@@ -17,9 +17,6 @@ fi
 MACRO_ENV=$(basename "$ENV_DIR")
 
 # ---------------------------------------------------------
-# UTILITY: Smart Interactive .env Builder
-# ---------------------------------------------------------
-# ---------------------------------------------------------
 # UTILITY: Smart Interactive .env Builder with Auto-Resolve
 # ---------------------------------------------------------
 build_env_interactively() {
@@ -175,6 +172,35 @@ do_edit() {
     do_update_single "$site_name" "--force"
 }
 
+do_remove() {
+    local site_name=$1
+    local target_dir="$ENV_DIR/$site_name"
+
+    if [ ! -d "$target_dir" ]; then
+        echo "❌ Site '$site_name' not found in $ENV_DIR"
+        exit 1
+    fi
+
+    echo "⚠️  WARNING: You are about to PERMANENTLY remove '$site_name'."
+    echo "This will stop containers, delete volumes (DB data), and remove all files."
+    read -p "Are you absolutely sure? [y/N]: " confirm < /dev/tty
+    
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "❌ Aborted."
+        exit 0
+    fi
+
+    echo "[Manager] 🛑 Stopping containers and removing volumes..."
+    if [ -f "$target_dir/docker-compose.yml" ]; then
+        (cd "$target_dir" && docker compose down -v)
+    fi
+
+    echo "[Manager] 🗑️  Deleting directory: $target_dir"
+    sudo rm -rf "$target_dir"
+
+    echo "✅ '$site_name' has been completely removed."
+}
+
 # ---------------------------------------------------------
 # MAIN ROUTING LOGIC
 # ---------------------------------------------------------
@@ -194,6 +220,7 @@ fi
 case "$COMMAND" in
     install)          do_update_all ""; do_install "$2" ;; 
     edit)             do_edit "$2" ;;
+    remove)           do_remove "$2" ;;
     update)           do_update_single "$2" "" ;;
     force-update)     do_update_single "$2" "--force" ;;
     update-all)       do_update_all "" ;;
