@@ -19,6 +19,9 @@ MACRO_ENV=$(basename "$ENV_DIR")
 # ---------------------------------------------------------
 # UTILITY: Smart Interactive .env Builder
 # ---------------------------------------------------------
+# ---------------------------------------------------------
+# UTILITY: Smart Interactive .env Builder with Auto-Resolve
+# ---------------------------------------------------------
 build_env_interactively() {
     local target_dir=$1
     echo "[Manager] 📝 Configuring environment variables for $(basename "$target_dir")"
@@ -32,32 +35,38 @@ build_env_interactively() {
     > "$temp_env"
 
     while IFS= read -r line || [ -n "$line" ]; do
-        # Preserve comments and empty lines
         if [[ -z "$line" || "$line" == \#* ]]; then
             echo "$line" >> "$temp_env"
             continue
         fi
 
-        # Extract key and default value from template.env
         local key=$(echo "$line" | cut -d '=' -f 1)
         local default_val=$(echo "$line" | cut -d '=' -f 2- || true)
         
+        # --- AUTO-RESOLVE LOGIC ---
+        # If default_val starts with $, we resolve it from already defined variables
+        if [[ "$default_val" == \$* ]]; then
+            local ref_key=${default_val#$}
+            local resolved_val=$(grep "^${ref_key}=" "$temp_env" | cut -d '=' -f 2- || true)
+            
+            if [ -n "$resolved_val" ]; then
+                echo "[Manager] 🔗 Auto-linked $key -> $ref_key ($resolved_val)"
+                echo "${key}=${resolved_val}" >> "$temp_env"
+                continue
+            fi
+        fi
+
+        # Standard interactive logic
         local current_val=""
-        # Extract existing value from .env if it exists
         if [ -f "$target_dir/.env" ]; then
             current_val=$(grep "^${key}=" "$target_dir/.env" | cut -d '=' -f 2- || true)
         fi
 
-        # Priority: Current value (if editing) > Default value (from template)
         local suggested_val="${current_val:-$default_val}"
-
         local user_val=""
-        # Read user input from /dev/tty to avoid stdin conflicts
         read -p "🔑 $key [$suggested_val]: " user_val < /dev/tty
         
-        # Fallback to suggested_val if user input is empty (just pressed Enter)
         local final_val="${user_val:-$suggested_val}"
-
         echo "${key}=${final_val}" >> "$temp_env"
     done < "$target_dir/template.env"
 
