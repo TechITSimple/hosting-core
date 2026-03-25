@@ -13,13 +13,13 @@ Each macro-environment contains its own clone of this `hosting-core` repository 
 Follow this exact structure for each environment to maintain isolation and avoid nested Git repositories:
 
 ```text
-/home/tis/websites/[ENV]/  <-- e.g., personal-prod, clients-test
+/home/tis/websites/[ENV]/       <-- e.g., personal-prod, clients-test
 ├── .env                      # SHARED GLOBAL CONFIG (Auto-copied from core's global.env)
-├── update.sh                 # MACRO-ENV UPDATE SCRIPT (Auto-copied from core's global.update.sh)
+├── manager.sh                # MACRO-ENV MANAGER CLI (Auto-copied from core's manager.sh)
 │
 ├── hosting-core/             # THIS REPOSITORY (The "Engine" of the environment)
 │   ├── global.env                # SHARED CONFIG TEMPLATE (Auto-copied to parent ../.env)
-│   ├── global.update.sh          # MASTER SCRIPT TEMPLATE (Auto-copied to parent ../update.sh)
+│   ├── manager.sh                # MASTER SCRIPT (Auto-copied to parent ../manager.sh)
 │   ├── template.env              # SECRET CONFIG TEMPLATE (Pushed to GitHub)
 │   ├── .env                      # SECRET CONFIG (Manually written, ignored by Git)
 │   ├── update.sh                 # CORE UPDATE SCRIPT
@@ -43,18 +43,21 @@ To prevent accidental leaks of credentials:
 
 ## 🛠 Installation & Bootstrap
 
+To initialize a brand new macro-environment on the VPS, use the root setup script. This will automatically create the folder, clone this repository, ask for your Cloudflare token, and set up the necessary file permissions.
+
+Create the setup script on your server:
 ```bash
 nano /home/tis/websites/setup-env.sh
 ```
 
-Copy-paste the following code:
+Copy-paste the following code into the file:
 ```bash
 #!/bin/bash
 set -e
 
-# Check if environment name is provided
+# Step 1: Validate input
 if [ -z "$1" ]; then
-    echo "❌ Error: Please provide an environment name."
+    echo "Error: Please provide an environment name."
     echo "Usage: ./setup-env.sh <environment-name>"
     echo "Example: ./setup-env.sh clients-prod"
     exit 1
@@ -67,61 +70,55 @@ echo "========================================="
 echo "🏗️ BOOTSTRAPPING ENVIRONMENT: $ENV_NAME"
 echo "========================================="
 
-# 1. Create the macro-environment directory
+# Step 2: Create directory
 if [ -d "$TARGET_DIR" ]; then
-    echo "❌ Error: Directory $TARGET_DIR already exists."
+    echo "Error: Directory $TARGET_DIR already exists."
     exit 1
 fi
 
 echo "[Installer] 📁 Creating directory: $TARGET_DIR"
 mkdir -p "$TARGET_DIR"
 
-# 2. Clone the hosting-core repository
+# Step 3: Clone the core repository as 'tis' user
 echo "[Installer] 📥 Cloning hosting-core repository..."
 cd "$TARGET_DIR"
-# Clone using the 'tis' service user to ensure correct SSH key usage
 sudo -u tis git clone git@github.com:TechITSimple/hosting-core.git hosting-core
 
-# 3. Apply correct ownership and permissions
+# Step 4: Apply permissions and setgid bit
 echo "[Installer] 🔐 Applying permissions (tis:web-admins)..."
 sudo chown -R tis:web-admins "$TARGET_DIR"
 sudo chmod -R 775 "$TARGET_DIR"
-
-# Ensure setgid bit is applied so future files inherit the web-admins group
 sudo find "$TARGET_DIR" -type d -exec chmod g+s {} +
 
-# 4. Bootstrap files to the environment root
+# Step 5: Bootstrap the manager and global environment file
 echo "[Installer] ⚙️ Setting up manager.sh and global configs..."
 cp hosting-core/global.env .env
 cp hosting-core/manager.sh manager.sh
 chmod +x manager.sh
 
-# 5. Prepare the local secret template for the tunnel
-echo "[Installer] 📝 Initializing tunnel configuration..."
+# Step 6: Interactively prompt for the Tunnel Token
+echo "[Installer] 📝 Configuring Cloudflare Tunnel Token..."
 if [ -f "hosting-core/template.env" ]; then
     cp hosting-core/template.env hosting-core/.env
+    
+    read -p "🔑 Enter Cloudflare TUNNEL_TOKEN for $ENV_NAME: " tunnel_token
+    sed -i "s/^TUNNEL_TOKEN=.*/TUNNEL_TOKEN=${tunnel_token}/" hosting-core/.env
+    
+    echo "[Installer] ✅ Token saved to hosting-core/.env."
+else
+    echo "[Installer] ⚠️ template.env not found in hosting-core. Skipping token setup."
 fi
 
+# Step 7: Trigger the initial update for the entire environment
 echo "========================================="
-echo "✅ ENVIRONMENT '$ENV_NAME' READY!"
+echo "🚀 STARTING INITIAL DEPLOYMENT"
 echo "========================================="
-echo "Next steps:"
-echo "1. cd $TARGET_DIR"
-echo "2. Edit the tunnel token: nano hosting-core/.env"
-echo "3. Start the core: ./manager.sh update-all"
+./manager.sh update-all
 ```
 
-and finally:
+Make it executable and run it:
 ```bash
 chmod +x /home/tis/websites/setup-env.sh
-```
-
-## 🚀 Quick Environment Setup
-
-To initialize a brand new macro-environment on the VPS, use the root setup script. This will automatically create the folder, clone this repository, and set up the necessary file permissions.
-
-```bash
-cd /home/tis/websites/
 ./setup-env.sh new-environment-name
 ```
 
@@ -136,6 +133,19 @@ networks:
   tis_proxy:
     name: ${NETWORK_NAME}
     external: true
+```
+
+and this in your satellite's `.gitignore` to prevent secret leaks and update conflicts:
+```text
+# Ignore secret environment variables
+.env
+.env.*
+
+# Track the template for environment variables
+!template.env
+
+# Ignore the auto-generated update script managed by the core
+update.sh
 ```
 
 *Note: The `update.sh` script automatically handles the injection of `${NETWORK_NAME}` and `${COMPOSE_PROJECT_NAME}` into the Docker environment before running `docker compose up`.*
