@@ -47,7 +47,7 @@ fi
 
 # 5. DOCKER DEPLOYMENT
 echo "[$SITE_NAME] 🏗️ Processing containers (Network: $NETWORK_NAME)..."
-docker compose up -d --build > /dev/null
+docker compose up -d --build --force-recreate> /dev/null
 
 # 6. POST-UPDATE HOOK
 if [ -f "post-update.sh" ]; then
