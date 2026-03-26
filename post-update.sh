@@ -10,7 +10,7 @@ echo "[Core-Hook] Propagating updated manager.sh to environment root..."
 
 # Copy from core to root. manager.sh in core doesn't need to be executable,
 # but the one in the root must be.
-cp "$CORE_DIR/manager.sh" "$ENV_DIR/manager.sh"
+cp "manager.sh" "$ENV_DIR/manager.sh"
 chmod +x "$ENV_DIR/manager.sh"
 
 echo "[Core-Hook] Manager script is now synchronized and executable in $ENV_DIR"
