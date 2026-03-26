@@ -82,9 +82,6 @@ do_update_single() {
     echo "========================================="
     echo "🔄 UPDATING SATELLITE: $site_name"
     echo "========================================="
-    
-    cp "$CORE_DIR/update.sh" "$target_dir/update.sh"
-    sudo chmod +x "$target_dir/update.sh"
 
     # Use sudo for hooks as they might be owned by 'tis' user
     for hook in "pre-update.sh" "post-update.sh"; do
@@ -94,7 +91,7 @@ do_update_single() {
         fi
     done
 
-    (cd "$target_dir" && ./update.sh $force_flag)
+    (cd "$target_dir" && tis-update $force_flag)
 }
 
 do_update_all() {
