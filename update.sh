@@ -33,17 +33,36 @@ if [ -f "pre-update.sh" ]; then
     source pre-update.sh
 fi
 
-# 4. GIT PULL (AS SERVICE USER)
-LOCAL_COMMIT=$(git rev-parse HEAD)
-# Pulling as 'tis' ensures the Bot SSH key is used and prevents permission conflicts
-sudo -u tis git pull > /dev/null
-REMOTE_COMMIT=$(git rev-parse HEAD)
+# 3.5. GIT CONFIGURATION (Anti-Permission Errors)
+# Configure Git to ignore chmod edits
+sudo -u tis git config core.filemode false
 
-if [ "$LOCAL_COMMIT" = "$REMOTE_COMMIT" ] && [ "$FORCE_UPDATE" -eq 0 ]; then
-    echo "[$SITE_NAME] ⏭️ No new Git changes. Skipping Docker process."
-    echo ""
-    exit 0
+# 4. GIT PULL & CONFLICT MANAGEMENT
+LOCAL_COMMIT=$(git rev-parse HEAD)
+
+echo "[$SITE_NAME] 📡 Fetching remote changes..."
+sudo -u tis git fetch origin > /dev/null
+
+# Check for potential conflicts
+if ! sudo -u tis git merge-base --is-ancestor HEAD origin/main; then
+    echo "[$SITE_NAME] ⚠️ CONFLICT DETECTED: Local changes would be overwritten."
+    
+    # Interactive prompt
+    read -p "[$SITE_NAME] Do you want to FORCE the GitHub version (discards local changes)? [y/N]: " CONFIRM
+    
+    if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+        echo "[$SITE_NAME] 💥 Forcing remote version (git reset --hard)..."
+        sudo -u tis git reset --hard origin/main > /dev/null
+    else
+        echo "[$SITE_NAME] ❌ Update aborted by user to protect local changes."
+        exit 1
+    fi
+else
+    # If no conflicts, normally pull
+    sudo -u tis git pull > /dev/null
 fi
+
+REMOTE_COMMIT=$(git rev-parse HEAD)
 
 # 5. DOCKER DEPLOYMENT
 echo "[$SITE_NAME] 🏗️ Processing containers (Network: $NETWORK_NAME)..."
