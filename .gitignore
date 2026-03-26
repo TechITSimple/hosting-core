@@ -7,7 +7,6 @@
 !/.gitignore
 !/README.md
 !/docker-compose.yml
-!/update.sh
 !/post-update.sh
 !/template.env
 !/global.env
