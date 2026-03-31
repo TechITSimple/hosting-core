@@ -3,7 +3,7 @@
 services:
   tunnel:
     image: cloudflare/cloudflared:latest
-    container_name: ${COMPOSE_PROJECT_NAME}-tunnel
+    container_name: ${ENV_NAME}_cloudflared
     restart: always
     
     env_file:
