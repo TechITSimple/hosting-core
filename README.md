@@ -57,11 +57,14 @@ This command will automatically:
 
 ## 🛰 Connecting Satellites
 
-Because networks are generated dynamically (e.g., `personal-prod-net`), satellite `docker-compose.yml` files must reference the network using the auto-injected `${NETWORK_NAME}` variable.
+Because environments are generated and managed dynamically (e.g., `personal-prod-net`), satellite `docker-compose.yml` files must reference the container_name and network using the auto-injected `${ENV_NAME}` and `${NETWORK_NAME}` variables.
 
-Add this at the bottom of your satellite's `docker-compose.yml`:
+Add this to your satellite's `docker-compose.yml`:
 
 ```yaml
+...
+   container_name: ${ENV_NAME}_    # add here the container's name
+...
 networks:
   tis_proxy:
     name: ${NETWORK_NAME}
