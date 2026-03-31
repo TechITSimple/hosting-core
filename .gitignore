@@ -7,10 +7,10 @@
 !/.gitignore
 !/README.md
 !/docker-compose.yml
+!/pre-update.sh
 !/post-update.sh
 !/template.env
 !/global.env
-!/manager.sh
 
 # Explicitly ignore all directories and their content
 # This ensures that any future config folder stays local-only
